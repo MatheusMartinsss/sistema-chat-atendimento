@@ -35,5 +35,8 @@ return [
         'login_path' => env('AUTH_API_LOGIN_PATH', '/auth/login'),
         'logout_path' => env('AUTH_API_LOGOUT_PATH', '/auth/logout'),
     ],
+    'api' =>[
+        'url' => env('AUTH_API_BASE_URL')
+    ]
 
 ];
