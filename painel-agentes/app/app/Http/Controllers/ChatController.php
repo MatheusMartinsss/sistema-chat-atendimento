@@ -18,7 +18,7 @@ class ChatController extends Controller
     public function index()
     {
         $chats = $this->mockChats();
-        // carrega a dashboard com a sidebar e, opcionalmente, um chat inicial
+
         $initial = [
             'id' => 101,
             'client_name' => 'João Silva',
@@ -31,12 +31,12 @@ class ChatController extends Controller
 
         return view('dashboard.index', [
             'chats' => $chats,
-            'chat' => $initial,   // opcional
+            'chat' => $initial,   
         ]);
     }
     public function show(int $id)
     {
-        // MOCK: detalhe do chat
+   
         $chat = [
             'id' => $id,
             'client_name' => 'Cliente Exemplo',
@@ -62,7 +62,7 @@ class ChatController extends Controller
             ],
         ];
 
-        // retorna o componente como HTML
+
         return view('components.chat.show', ['chat' => $chat])->render();
     }
 }

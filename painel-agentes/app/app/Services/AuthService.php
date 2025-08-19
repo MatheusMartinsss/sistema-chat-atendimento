@@ -36,7 +36,7 @@ class AuthService
             throw new \Exception($msg, $resp->status()); 
         }
 
-        return $resp->json(); // retorna o payload da API*/
+        return $resp->json(); 
     }
 
     public function logout(?string $token): void
