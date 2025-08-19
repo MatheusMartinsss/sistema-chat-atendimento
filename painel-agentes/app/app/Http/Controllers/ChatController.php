@@ -1,68 +1,76 @@
 <?php
 
 namespace App\Http\Controllers;
-
 use Illuminate\Http\Request;
+use App\Services\ChatService;
 
 class ChatController extends Controller
 {
-    private function mockChats(): array
+    private ChatService $chatService;
+    public function __construct(ChatService $chatService)
     {
-        return [
-            ['id' => 101, 'client_name' => 'João Silva', 'status' => 'open', 'last_msg' => 'Preciso de ajuda...'],
-            ['id' => 102, 'client_name' => 'Maria Souza', 'status' => 'pending', 'last_msg' => 'Aguardando retorno...'],
-            ['id' => 103, 'client_name' => 'Carlos Pereira', 'status' => 'closed', 'last_msg' => 'Obrigado!'],
-            ['id' => 104, 'client_name' => 'Ana Lima', 'status' => 'open', 'last_msg' => 'Meu boleto venceu.'],
-        ];
+        $this->chatService = $chatService;
     }
-    public function index()
-    {
-        $chats = $this->mockChats();
 
-        $initial = [
-            'id' => 101,
-            'client_name' => 'João Silva',
-            'status' => 'open',
-            'messages' => [
-                ['author' => 'client', 'text' => 'Olá, tudo bem?'],
-                ['author' => 'agent', 'text' => 'Olá! Em que posso ajudar?'],
-            ],
+    public function sendMessage(Request $request, int $id)
+    {
+
+        $data = $request->validate([
+            'message' => ['required', 'string', 'max:2000']
+        ]);
+
+
+
+        $pendingKey = "pending_messages.$id";
+        $pending = $request->session()->get($pendingKey, []);
+        $pending[] = [
+            'author' => 'agent',
+            'text' => $data['message'],
         ];
+        $request->session()->put($pendingKey, $pending);
+        $chat = $this->composeChat($request, $id);
+        return view('components.chat.show', ['chat' => $chat])->render();
+
+    }
+    public function index(Request $request)
+    {
+
+        $chats = $this->chatService->getChats();
+
+        $selectedId = $request->session()->get("selected_chat");
+        $chat = $selectedId ? $this->composeChat($request, $selectedId) : null;
 
         return view('dashboard.index', [
             'chats' => $chats,
-            'chat' => $initial,   
+            'chat' => $chat,
         ]);
     }
-    public function show(int $id)
-    {
-   
-        $chat = [
-            'id' => $id,
-            'client_name' => 'Cliente Exemplo',
-            'status' => 'open',
-            'messages' => [
-                ['author' => 'client', 'text' => 'Olá, tudo bem?'],
-                ['author' => 'agent', 'text' => 'Olá! Em que posso ajudar?'],
-            ],
-        ];
 
-        return view('components.chat.show', compact('chat'));
+    public function close(Request $request)
+    {
+
+        if ($id = $request->session()->get('selected_chat')) {
+            $request->session()->forget('pending_messages.$id');
+
+        }
+        $request->session()->forget('selected_chat');
+
+        return view('components.chat.show', ['chat' => null])->render();
     }
 
-    public function partial(int $id)
+    public function partial(Request $request, int $id)
     {
-        $chat = [
-            'id' => $id,
-            'client_name' => 'Cliente #' . $id,
-            'status' => 'open',
-            'messages' => [
-                ['author' => 'client', 'text' => 'Mensagem do cliente no chat ' . $id],
-                ['author' => 'agent', 'text' => 'Resposta do agente.'],
-            ],
-        ];
-
+        $request->session()->put('selected_chat', $id);
+        $chat = $this->chatService->getChatById($id);
 
         return view('components.chat.show', ['chat' => $chat])->render();
+    }
+
+    private function composeChat(Request $request, int $id): array
+    {
+        $chat = $this->chatService->getChatById($id); 
+        $pending = $request->session()->get("pending_messages.$id", []);
+        $chat['messages'] = array_values(array_merge($chat['messages'] ?? [], $pending));
+        return $chat;
     }
 }

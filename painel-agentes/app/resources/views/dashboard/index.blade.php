@@ -22,18 +22,14 @@
             </div>
         </div>
 
- 
         <div class="d-flex flex-grow-1">
-            <x-chat.sidebar :chats="$chats" :active="$chat['id'] ?? null" />
+
+            <x-chat.sidebar :chats="$chats" :active="data_get($chat, 'id')" />
 
             <div id="chatArea" class="flex-grow-1 p-3">
-                @isset($chat)
-                    <x-chat.show :chat="$chat" />
-                @else
-                    <div class="alert alert-info">
-                        Selecione um chat na barra lateral.
-                    </div>
-                @endisset
+                <div id="chat-container">
+                    @include('components.chat.show', ['chat' => $chat])
+                </div>
             </div>
         </div>
     </div>

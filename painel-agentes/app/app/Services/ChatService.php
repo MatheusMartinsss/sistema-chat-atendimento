@@ -33,6 +33,14 @@ class ChatService
 
         return $resp->json();
     }
+    public function getChatById(int $id): array
+    {
+        $resp = Http::baseUrl($this->baseUrl)
+            ->acceptJson()
+            ->get("/chat/$id")
+            ->throw();
 
-  
+        return $resp->json();
+    }
+
 }

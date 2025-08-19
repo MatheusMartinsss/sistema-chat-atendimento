@@ -18,14 +18,13 @@
     @forelse ($chats as $c)
       @php
         $isActive = (string)($active ?? '') === (string)$c['id'];
-        $badgeClass = match($c['status']) { 'open'=>'bg-success', 'pending'=>'bg-warning text-dark', 'closed'=>'bg-secondary', default=>'bg-light text-dark' };
-        $label = match($c['status']) { 'open'=>'Aberto', 'pending'=>'Pendente', 'closed'=>'Fechado', default=>ucfirst($c['status']) };
+        $badgeClass = match($c['status']) { 'open'=>'bg-success', 'waiting'=>'bg-warning text-dark', 'closed'=>'bg-secondary', default=>'bg-light text-dark' };
+        $label = match($c['status']) { 'open'=>'Aberto', 'waiting'=>'Pendente', 'closed'=>'Fechado', default=>ucfirst($c['status']) };
       @endphp
 
       <a href="{{ route('chats.partial', $c['id']) }}"
-         class="list-group-item list-group-item-action d-flex align-items-start chat-link @if($isActive) active @endif"
-         data-client="{{ Str::slug($c['client_name'], ' ') }}"
-         data-chat-id="{{ $c['id'] }}">
+   class="list-group-item list-group-item-action chat-link"
+   onclick="return openChat(event, this);">
         <div class="me-2 mt-1">
           <span class="badge rounded-pill {{ $badgeClass }}">{{ $label }}</span>
         </div>
@@ -46,6 +45,17 @@
 </div>
 
 <script>
+function openChat(ev, link) {
+  ev.preventDefault();
+  const url = link.getAttribute('href');
+  const container = document.getElementById('chat-container');
+  container.innerHTML = '<div class="p-3 text-muted">Carregando...</div>';
+
+  fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+    .then(r => r.text()).then(html => container.innerHTML = html)
+    .catch(() => container.innerHTML = '<div class="alert alert-danger m-3">Falha ao carregar o chat.</div>');
+}
+
   function filterChats(q) {
     q = (q || '').toLowerCase();
     const items = document.querySelectorAll('#chatList .list-group-item');
@@ -54,30 +64,4 @@
       li.style.display = name.includes(q) ? '' : 'none';
     });
   }
-
-  // Intercepta os cliques da sidebar e carrega o componente via fetch
-  document.addEventListener('click', async function (e) {
-    const link = e.target.closest('.chat-link');
-    if (!link) return;
-
-    e.preventDefault();
-
-    // feedback visual: marca ativo
-    document.querySelectorAll('.chat-link.active').forEach(el => el.classList.remove('active'));
-    link.classList.add('active');
-
-    const url = link.getAttribute('href');
-    const chatArea = document.getElementById('chatArea');
-    if (!chatArea) return;
-
-    chatArea.innerHTML = '<div class="p-3 text-muted">Carregando...</div>';
-
-    try {
-      const resp = await fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
-      const html = await resp.text();
-      chatArea.innerHTML = html;
-    } catch (err) {
-      chatArea.innerHTML = '<div class="alert alert-danger m-3">Falha ao carregar o chat.</div>';
-    }
-  });
 </script>
