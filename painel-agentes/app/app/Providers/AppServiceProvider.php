@@ -23,7 +23,7 @@ class AppServiceProvider extends ServiceProvider
     {
         Http::macro('api', function () {
             $token = session('token'); 
-            return Http::baseUrl(config('services.api.url')) // coloque sua URL da API no config/services.php
+            return Http::baseUrl(config('services.api.url')) 
                 ->acceptJson()
                 ->asJson()
                 ->when($token, fn($http) => $http->withToken($token));
