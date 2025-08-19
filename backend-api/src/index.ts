@@ -1,27 +1,21 @@
-import express, { Request, Response } from "express";
-import { AppDataSource } from "./config/data-source";
 import "reflect-metadata";
+import express from "express";
+import cors from "cors";
+import { AppDataSource } from "./config/data-source";
+import router from "./routes";
+import { createInitial } from "./initialScript";
+
 const app = express();
-const PORT = process.env.PORT || 8081;
-
-
+app.use(cors());
 app.use(express.json());
 
-
-app.get("/", (req: Request, res: Response) => {
-    res.send("Hello word");
-});
-
-app.listen(PORT, () => {
-    console.log(`Servidor rodando em http://localhost:${PORT}`);
-});
+app.use("/api", router);
 
 AppDataSource.initialize()
     .then(() => {
-        console.log("📦 Banco conectado com sucesso!");
-
-        app.listen(3000, () => {
-            console.log("🚀 Servidor rodando na porta 3000");
-        });
+        console.log("✅ DB conectado");
+        const PORT = process.env.PORT || 3001;
+        app.listen(PORT, () => console.log(`🚀 API em http://localhost:${PORT}`));
+        createInitial()
     })
-    .catch((error) => console.error("Erro ao conectar no banco:", error));
+    .catch((e) => console.error("❌ DB erro:", e));
