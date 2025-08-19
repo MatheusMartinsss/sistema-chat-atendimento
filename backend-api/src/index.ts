@@ -1,6 +1,6 @@
 import express, { Request, Response } from "express";
 import { AppDataSource } from "./config/data-source";
-
+import "reflect-metadata";
 const app = express();
 const PORT = process.env.PORT || 8081;
 
