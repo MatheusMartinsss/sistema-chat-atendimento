@@ -19,16 +19,8 @@ class AuthService
 
     public function login(string $email, string $password): array
     {
-        return [
-            'token' => 'fake-token-123',
-            'refresh_token' => 'fake-refresh-456',
-            'user' => [
-                'id' => 1,
-                'name' => 'Agente Demo',
-                'email' => $email, // pode usar o que o usuário digitou
-            ],
-        ];
-        /*$resp = Http::baseUrl($this->baseUrl)
+       
+        $resp = Http::baseUrl($this->baseUrl)
             ->acceptJson()
             ->post($this->loginPath, [
                 'email' => $email,

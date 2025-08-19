@@ -27,7 +27,7 @@ class AuthController extends Controller
         try {
             $data = $this->authService->login($validated['email'], $validated['password']);
             $request->session()->put('agent', $data['user'] ?? []);
-            $request->session()->put('token', $data['token'] ?? null);
+            $request->session()->put('token', $data['access_token'] ?? null);
 
             return redirect()->route('dashboard');
         } catch (\Exception $e) {
