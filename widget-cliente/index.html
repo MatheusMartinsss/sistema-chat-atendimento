@@ -1,4 +1,5 @@
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
 
 <style>
     /* === WIDGET STYLES === */
@@ -161,10 +162,18 @@
 <script>
     (() => {
 
-        const SOCKET_URL = 'http://localhost:8081'; 
-  
+        const API_URL = 'http://localhost:8081/api';
+
+        const api = axios.create({
+            baseURL: API_URL,
+            headers: { 'Content-Type': 'application/json' }
+        });
+
         let conversationId = localStorage.getItem('rc_conversation_id') || null;
 
+        if (conversationId) {
+            loadChat({ id: conversationId })
+        }
 
         const fab = document.getElementById('rcFab');
         const panel = document.getElementById('rcPanel');
@@ -202,35 +211,13 @@
         const escapeHtml = (s = '') => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[c]));
 
 
-        let socket = null;
-        const connectSocket = () => {
-            if (socket) { try { socket.disconnect(); } catch (_) { } }
-            socket = io(SOCKET_URL, { transports: ['websocket'], autoConnect: true });
-            socket.on('connect', () => {
-                setStatus('Online');
-                if (conversationId) {
-                    socket.emit('client:join', { conversationId: Number(conversationId) });
-                }
-            });
-            socket.on('disconnect', () => setStatus('Desconectado'));
-            socket.on('reconnect_attempt', () => setStatus('Reconectando…'));
-
-            socket.on('message:new', (msg) => {
-
-                if (String(msg.conversation_id) !== String(conversationId)) return;
-                const who = msg.author_type === 'agent' ? 'agent' : 'client';
-                addMsg(who, msg.text);
-            });
-        };
-
         fab.addEventListener('click', () => {
             openPanel();
 
-            if (!socket || !socket.connected) connectSocket();
         });
         closeBtn.addEventListener('click', closePanel);
 
-        startBtn.addEventListener('click', () => {
+        startBtn.addEventListener('click', async () => {
             const name = nameEl.value.trim();
             const email = emailEl.value.trim();
             if (!name || !email) {
@@ -239,40 +226,53 @@
             }
             localStorage.setItem('rc_name', name);
             localStorage.setItem('rc_email', email);
-            
-            if (!conversationId) {
-                conversationId = String(Math.floor(Math.random() * 900000) + 100000);
-                localStorage.setItem('rc_conversation_id', conversationId);
+
+            toggleChat()
+
+            try {
+                const data = await startChat({ name, email })
+                if (data.id) {
+                    localStorage.setItem('rc_conversation_id', data.id)
+
+                }
+                console.log(data)
+            } catch (ex) {
+                console.error(Ex)
             }
-
-            formBox.style.display = 'none';
-            chatBox.style.display = 'block';
-            inputBar.style.display = 'flex';
-
-            if (!socket || !socket.connected) connectSocket();
-            else socket.emit('client:join', { conversationId: Number(conversationId) });
-
             addMsg('agent', `Olá ${name}! Como podemos ajudar?`);
         });
 
-        const sendCurrent = () => {
-            const text = textEl.value.trim();
-            if (!text) return;
-            if (!conversationId) return;
+        function toggleChat() {
+            formBox.style.display = 'none';
+            chatBox.style.display = 'block';
+            inputBar.style.display = 'flex';
+            addMsg('agent', `Olá ${name}! Como podemos ajudar?`)
+        }
 
-          
-            addMsg('client', text);
-            textEl.value = '';
-
-  
+        async function startChat({ name, email }) {
             try {
-                socket.emit('message:send', {
-                    conversation_id: Number(conversationId),
-                    author_type: 'client',
-                    text
-                });
-            } catch (e) { console.error(e); }
-        };
+                const response = await api.post('/chats', {
+                    name, email
+                })
+                return response.data
+            } catch (ex) {
+                console.error('Falha ao conectar')
+                throw ex;
+            }
+        }
+
+        async function loadChat({ id }) {
+            try {
+                const response = await api.get(`/chats/${id}`)
+                if (response.data.id) {
+                    openPanel()
+                    toggleChat()
+                }
+            } catch (ex) {
+                console.error('Falha ao carregar')
+                throw ex;
+            }
+        }
 
         sendBtn.addEventListener('click', sendCurrent);
         textEl.addEventListener('keydown', (e) => {
