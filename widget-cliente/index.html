@@ -1,0 +1,283 @@
+<script src="https://cdn.socket.io/4.7.5/socket.io.min.js" crossorigin="anonymous"></script>
+
+<style>
+    /* === WIDGET STYLES === */
+    .rc-fab {
+        position: fixed;
+        right: 18px;
+        bottom: 18px;
+        width: 56px;
+        height: 56px;
+        border-radius: 50%;
+        background: #0d6efd;
+        color: #fff;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, .2);
+        cursor: pointer;
+        z-index: 9998;
+    }
+
+    .rc-panel {
+        position: fixed;
+        right: 18px;
+        bottom: 84px;
+        width: 340px;
+        max-height: 520px;
+        display: none;
+        flex-direction: column;
+        background: #fff;
+        border-radius: 14px;
+        box-shadow: 0 16px 40px rgba(0, 0, 0, .25);
+        overflow: hidden;
+        z-index: 9999;
+        border: 1px solid #e9ecef;
+    }
+
+    .rc-header {
+        padding: 12px 14px;
+        background: #0d6efd;
+        color: #fff;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .rc-status {
+        font-size: 12px;
+        opacity: .9
+    }
+
+    .rc-body {
+        padding: 12px;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        overflow-y: auto;
+    }
+
+    .rc-form input {
+        width: 100%;
+        padding: 10px;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+    }
+
+    .rc-btn {
+        appearance: none;
+        border: 0;
+        background: #0d6efd;
+        color: #fff;
+        padding: 10px 12px;
+        border-radius: 8px;
+        cursor: pointer;
+    }
+
+    .rc-btn:disabled {
+        opacity: .6;
+        cursor: not-allowed;
+    }
+
+    .rc-msg {
+        display: flex;
+        gap: 8px;
+    }
+
+    .rc-msg .bubble {
+        padding: 10px 12px;
+        border-radius: 12px;
+        max-width: 80%;
+    }
+
+    .rc-msg.client .bubble {
+        background: #f1f3f5;
+    }
+
+    .rc-msg.agent .bubble {
+        background: #e7f1ff;
+        margin-left: auto;
+    }
+
+    .rc-input {
+        display: flex;
+        gap: 8px;
+        border-top: 1px solid #e9ecef;
+        padding: 10px;
+    }
+
+    .rc-input input {
+        flex: 1;
+        padding: 10px;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+    }
+
+    .rc-close {
+        background: transparent;
+        color: #fff;
+        border: 0;
+        font-size: 18px;
+        cursor: pointer;
+    }
+
+    .rc-tag {
+        font-size: 11px;
+        color: #6c757d;
+    }
+</style>
+
+<div class="rc-fab" id="rcFab" title="Atendimento">💬</div>
+
+<div class="rc-panel" id="rcPanel" aria-live="polite">
+    <div class="rc-header">
+        <div>
+            <div><strong>Atendimento</strong></div>
+            <div class="rc-status" id="rcStatus">Conectando…</div>
+        </div>
+        <button class="rc-close" id="rcClose">✕</button>
+    </div>
+
+    <div class="rc-body" id="rcBody">
+        <div class="rc-form" id="rcForm">
+            <p class="rc-tag">Antes de começar, informe seus dados</p>
+            <div style="display:flex; flex-direction:column; gap:8px;">
+                <input type="text" id="rcName" placeholder="Seu nome" autocomplete="name" />
+                <input type="email" id="rcEmail" placeholder="Seu e-mail" autocomplete="email" />
+                <button class="rc-btn" id="rcStart">Iniciar chat</button>
+            </div>
+        </div>
+        <div id="rcChat" style="display:none; width:100%;">
+            <div id="rcMessages" style="display:flex; flex-direction:column; gap:8px;"></div>
+        </div>
+    </div>
+
+    <div class="rc-input" id="rcInput" style="display:none;">
+        <input type="text" id="rcText" placeholder="Digite sua mensagem…" />
+        <button class="rc-btn" id="rcSend">Enviar</button>
+    </div>
+</div>
+
+<script>
+    (() => {
+
+        const SOCKET_URL = 'http://localhost:8081'; 
+  
+        let conversationId = localStorage.getItem('rc_conversation_id') || null;
+
+
+        const fab = document.getElementById('rcFab');
+        const panel = document.getElementById('rcPanel');
+        const closeBtn = document.getElementById('rcClose');
+        const statusEl = document.getElementById('rcStatus');
+
+        const formBox = document.getElementById('rcForm');
+        const nameEl = document.getElementById('rcName');
+        const emailEl = document.getElementById('rcEmail');
+        const startBtn = document.getElementById('rcStart');
+
+        const chatBox = document.getElementById('rcChat');
+        const messagesEl = document.getElementById('rcMessages');
+        const inputBar = document.getElementById('rcInput');
+        const textEl = document.getElementById('rcText');
+        const sendBtn = document.getElementById('rcSend');
+
+
+        const savedName = localStorage.getItem('rc_name');
+        const savedEmail = localStorage.getItem('rc_email');
+        if (savedName) nameEl.value = savedName;
+        if (savedEmail) emailEl.value = savedEmail;
+
+
+        const openPanel = () => { panel.style.display = 'flex'; };
+        const closePanel = () => { panel.style.display = 'none'; };
+        const setStatus = (txt) => { statusEl.textContent = txt; };
+        const addMsg = (author, text) => {
+            const row = document.createElement('div');
+            row.className = `rc-msg ${author}`;
+            row.innerHTML = `<div class="bubble">${escapeHtml(text)}</div>`;
+            messagesEl.appendChild(row);
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+        };
+        const escapeHtml = (s = '') => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[c]));
+
+
+        let socket = null;
+        const connectSocket = () => {
+            if (socket) { try { socket.disconnect(); } catch (_) { } }
+            socket = io(SOCKET_URL, { transports: ['websocket'], autoConnect: true });
+            socket.on('connect', () => {
+                setStatus('Online');
+                if (conversationId) {
+                    socket.emit('client:join', { conversationId: Number(conversationId) });
+                }
+            });
+            socket.on('disconnect', () => setStatus('Desconectado'));
+            socket.on('reconnect_attempt', () => setStatus('Reconectando…'));
+
+            socket.on('message:new', (msg) => {
+
+                if (String(msg.conversation_id) !== String(conversationId)) return;
+                const who = msg.author_type === 'agent' ? 'agent' : 'client';
+                addMsg(who, msg.text);
+            });
+        };
+
+        fab.addEventListener('click', () => {
+            openPanel();
+
+            if (!socket || !socket.connected) connectSocket();
+        });
+        closeBtn.addEventListener('click', closePanel);
+
+        startBtn.addEventListener('click', () => {
+            const name = nameEl.value.trim();
+            const email = emailEl.value.trim();
+            if (!name || !email) {
+                alert('Informe nome e e-mail.');
+                return;
+            }
+            localStorage.setItem('rc_name', name);
+            localStorage.setItem('rc_email', email);
+            
+            if (!conversationId) {
+                conversationId = String(Math.floor(Math.random() * 900000) + 100000);
+                localStorage.setItem('rc_conversation_id', conversationId);
+            }
+
+            formBox.style.display = 'none';
+            chatBox.style.display = 'block';
+            inputBar.style.display = 'flex';
+
+            if (!socket || !socket.connected) connectSocket();
+            else socket.emit('client:join', { conversationId: Number(conversationId) });
+
+            addMsg('agent', `Olá ${name}! Como podemos ajudar?`);
+        });
+
+        const sendCurrent = () => {
+            const text = textEl.value.trim();
+            if (!text) return;
+            if (!conversationId) return;
+
+          
+            addMsg('client', text);
+            textEl.value = '';
+
+  
+            try {
+                socket.emit('message:send', {
+                    conversation_id: Number(conversationId),
+                    author_type: 'client',
+                    text
+                });
+            } catch (e) { console.error(e); }
+        };
+
+        sendBtn.addEventListener('click', sendCurrent);
+        textEl.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') { e.preventDefault(); sendCurrent(); }
+        });
+
+    })();
+</script>

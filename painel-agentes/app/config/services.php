@@ -30,5 +30,10 @@ return [
             'channel' => env('SLACK_BOT_USER_DEFAULT_CHANNEL'),
         ],
     ],
+    'auth_api' => [
+        'base_uri' => env('AUTH_API_BASE_URL'),
+        'login_path' => env('AUTH_API_LOGIN_PATH', '/auth/login'),
+        'logout_path' => env('AUTH_API_LOGOUT_PATH', '/auth/logout'),
+    ],
 
 ];
