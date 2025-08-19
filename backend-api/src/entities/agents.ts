@@ -30,6 +30,7 @@ export class Agents {
     password: string
 
     @Column({
+        type: 'enum',
         enum: status,
         default: status.OFFLINE
     })
