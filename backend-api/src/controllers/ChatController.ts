@@ -34,4 +34,10 @@ export class ChatController {
 
         return res.json(chat);
     }
+
+    static async getAll(req: Request, res: Response) {
+        const repo = AppDataSource.getRepository(Chat)
+        const chat = await repo.find({})
+        return res.json(chat)
+    }
 }
