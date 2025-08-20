@@ -9,7 +9,7 @@ router.post("/auth/login", AuthController.login)
 router.get('/auth/me', AuthController.me)
 
 router.post("/chats", ChatController.create)
-router.get("/chats/:id", ChatController.get)
-router.get('/chats', auth(true), ChatController.getAll  )
+router.get("/chat/:id", ChatController.get)
+router.get('/chats',  ChatController.getAll  )
 
 export default router;
