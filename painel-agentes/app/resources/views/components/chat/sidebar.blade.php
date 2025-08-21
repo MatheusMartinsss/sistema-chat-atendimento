@@ -24,6 +24,7 @@
 
       <a href="{{ route('chats.partial', $c['id']) }}"
    class="list-group-item list-group-item-action chat-link"
+   data-chat-id="{{ $c['id'] }}"
    onclick="return openChat(event, this);">
         <div class="me-2 mt-1">
           <span class="badge rounded-pill {{ $badgeClass }}">{{ $label }}</span>
@@ -51,8 +52,20 @@ function openChat(ev, link) {
   const container = document.getElementById('chat-container');
   container.innerHTML = '<div class="p-3 text-muted">Carregando...</div>';
 
+  const chatId = Number(link.dataset.chatId); 
+  console.log('abrindo chat', chatId);
+
+  ChatWS.join(chatId);
+
+  ChatWS.onMessage((msg) => {
+    console.log(msg)
+      const box = document.getElementById('messagesBox');
+      if (!box) return; 
+    });
+
   fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
-    .then(r => r.text()).then(html => container.innerHTML = html)
+    .then(r => r.text())
+    .then(html => container.innerHTML = html)
     .catch(() => container.innerHTML = '<div class="alert alert-danger m-3">Falha ao carregar o chat.</div>');
 }
 

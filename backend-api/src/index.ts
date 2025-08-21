@@ -17,10 +17,16 @@ const httpServer = http.createServer(app);
 
 AppDataSource.initialize()
     .then(() => {
+        
         console.log("DB conectado");
+
         const PORT = process.env.PORT || 3001;
         initSocket(httpServer);
-        app.listen(PORT, () => console.log(` API em http://localhost:${PORT}`));
-        createInitial()
+
+        httpServer.listen(PORT, () =>
+            console.log(`http://localhost:${PORT}`)
+        );
+
+
     })
     .catch((e) => console.error(" DB erro:", e));

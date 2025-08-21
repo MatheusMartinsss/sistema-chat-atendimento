@@ -5,7 +5,8 @@
     $messages = data_get($chat, 'messages', []);
 @endphp
 
-@if(!$hasChat || !$chatId)
+
+@if (!$hasChat || !$chatId)
     <div class="card shadow-sm w-100">
         <div class="card-body text-center text-muted py-5">
             <h5>Nenhum chat selecionado</h5>
@@ -13,69 +14,88 @@
         </div>
     </div>
 @else
-    <div class="card shadow-sm w-100">
+    <div class="card shadow-sm w-100" data-chat-id="{{ $chatId }}">
         <div class="card-header d-flex justify-content-between align-items-center">
             <strong>Chat #{{ $chatId }} — {{ $client }}</strong>
+        </div>
+
+        <div class="card-body message-box" style="height:380px;overflow-y:auto;">
 
         </div>
 
-        <div class="card-body" style="height:380px;overflow-y:auto;">
-            @forelse($messages as $m)
-                @php $author = data_get($m, 'author', 'client');
-                $text = data_get($m, 'text', ''); @endphp
-                <div class="mb-2">
-                    <strong class="{{ $author === 'agent' ? 'text-primary' : 'text-success' }}">
-                        {{ $author === 'agent' ? 'Agente' : 'Cliente' }}:
-                    </strong>
-                    <span>{{ $text }}</span>
-                </div>
-            @empty
-                <div class="text-muted">Sem mensagens.</div>
-            @endforelse
-        </div>
         <div class="card-footer">
-            <form id="chatForm-{{ $chatId }}" class="d-flex gap-2" method="POST"
-                onsubmit="return sendMsg(event, {{ $chatId }})">
-                @csrf
-                <input name="message" id="chatMessage-{{ $chatId }}" class="form-control"
-                    placeholder="Digite uma mensagem..." required>
+            <form onsubmit="return sendMsg(event, this)">
+                <input type="text" name="message" placeholder="Digite sua mensagem..." class="form-control" required>
                 <button class="btn btn-primary" type="submit">Enviar</button>
             </form>
         </div>
     </div>
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script>
+        const token = window.TOKEN.token
+        const q = new URLSearchParams(location.search);
+        const chatId = q.get('selected_chat')
 
+        const socket = io("http://localhost:8081", {
+            transports: ['websocket'],
+            auth: {
+                token,
+                chatId
+            }
+        });
+
+        socket.io.on('reconnect_attempt', () => {
+            socket.auth = { token };
+        });
+
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const container = document.querySelector('[data-chat-id]');
+
+            if (container) {
+                socket.emit('take_chat');
+            }
+        });
+        function appendMessage(author, text) {
+
+            const box = document.querySelector('.message-box');
+            if (!box) return;
+
+            const div = document.createElement('div');
+            const cls = author === 'agent' ? 'text-primary' : 'text-success';
+            const label = author === 'agent' ? 'Agente' : 'Cliente';
+
+            div.className = 'mb-2';
+            div.innerHTML = `<strong class="${cls}">${label}:</strong> <span>${escapeHtml(text)}</span>`;
+            box.appendChild(div);
+            box.scrollTop = box.scrollHeight;
+        }
+
+        function sendMsg(event, form) {
+            event.preventDefault();
+            const input = form.querySelector('input[name="message"]');
+            const messageText = input.value.trim();
+            if (!messageText) return false;
+
+            socket.emit('agent_message', messageText);
+
+            appendMessage('agent', messageText);
+            input.value = '';
+            input.focus();
+            return false;
+        }
+
+        socket.on('client_message', (message) => {
+            appendMessage('client', message);
+        });
+
+        function escapeHtml(text) {
+            return text
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+    </script>
 @endif
-<script>
-    function sendMsg(e, chatId) {
-        console.log(chatId, e)
-        e.preventDefault();
-        const form = e.target;
-        const fd = new FormData(form);
-
-        fetch(`{{ route('chat.sendMessage', ':id') }}`.replace(':id', chatId), {
-            method: 'POST',
-            headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' },
-            body: fd
-        })
-            .then(r => r.text())
-            .then(html => {
-                document.getElementById('chat-container').innerHTML = html;
-            });
-        form.reset();
-        return false;
-    }
-
-    function closeChat(e) {
-        e.preventDefault();
-        fetch(`{{ route('chat.close') }}`, {
-            method: 'POST',
-            headers: { 'X-CSRF-TOKEN': '{{ csrf_token() }}' }
-        })
-            .then(r => r.text())
-            .then(html => {
-                document.getElementById('chat-container').innerHTML = html; // estado vazio
-            });
-        return false;
-    }
-</script>
-</script>

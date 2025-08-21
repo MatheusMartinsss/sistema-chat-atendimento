@@ -12,6 +12,7 @@ Route::get('/', function () {
 Route::middleware('auth.session')->group(function () {
     Route::get('/dashboard', [ChatController::class, 'index'])->name('dashboard');
     Route::post('/chat/{id}/message', [ChatController::class, 'sendMessage'])->name('chat.sendMessage');
+    Route::post('/chats/{id}/receive', [ChatController::class, 'receiveMessage'])->name('chat.receive');
     Route::get('/chats/{id}/partial', [ChatController::class, 'partial'])->name('chats.partial');
     Route::post('/chat/close', [ChatController::class, 'close'])->name('chat.close');
 });

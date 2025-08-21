@@ -2,7 +2,6 @@
 <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
 
 <style>
-    /* === WIDGET STYLES === */
     .rc-fab {
         position: fixed;
         right: 18px;
@@ -161,123 +160,213 @@
 
 <script>
     (() => {
-
         const API_URL = 'http://localhost:8081/api';
+        const WS_URL = 'http://localhost:8081';
 
-        const api = axios.create({
-            baseURL: API_URL,
-            headers: { 'Content-Type': 'application/json' }
-        });
-
-        let conversationId = localStorage.getItem('rc_conversation_id') || null;
-
-        if (conversationId) {
-            loadChat({ id: conversationId })
-        }
 
         const fab = document.getElementById('rcFab');
         const panel = document.getElementById('rcPanel');
         const closeBtn = document.getElementById('rcClose');
         const statusEl = document.getElementById('rcStatus');
-
         const formBox = document.getElementById('rcForm');
         const nameEl = document.getElementById('rcName');
         const emailEl = document.getElementById('rcEmail');
         const startBtn = document.getElementById('rcStart');
-
         const chatBox = document.getElementById('rcChat');
         const messagesEl = document.getElementById('rcMessages');
         const inputBar = document.getElementById('rcInput');
         const textEl = document.getElementById('rcText');
         const sendBtn = document.getElementById('rcSend');
 
-
-        const savedName = localStorage.getItem('rc_name');
-        const savedEmail = localStorage.getItem('rc_email');
-        if (savedName) nameEl.value = savedName;
-        if (savedEmail) emailEl.value = savedEmail;
+        let conversationId = localStorage.getItem('rc_conversation_id');
+        let socket = null;
+        let api = null;
 
 
-        const openPanel = () => { panel.style.display = 'flex'; };
-        const closePanel = () => { panel.style.display = 'none'; };
-        const setStatus = (txt) => { statusEl.textContent = txt; };
-        const addMsg = (author, text) => {
+        function init() {
+
+            api = axios.create({
+                baseURL: API_URL,
+                headers: { 'Content-Type': 'application/json' }
+            });
+
+            const savedName = localStorage.getItem('rc_name');
+            const savedEmail = localStorage.getItem('rc_email');
+            if (savedName) nameEl.value = savedName;
+            if (savedEmail) emailEl.value = savedEmail;
+
+
+            if (conversationId) {
+                loadChat(conversationId);
+            }
+
+
+            setupEventListeners();
+        }
+
+        function setupEventListeners() {
+            fab.addEventListener('click', openPanel);
+            closeBtn.addEventListener('click', closePanel);
+            startBtn.addEventListener('click', startChat);
+            sendBtn.addEventListener('click', sendCurrent);
+            textEl.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    sendCurrent();
+                }
+            });
+        }
+
+        function openPanel() {
+            panel.style.display = 'flex';
+        }
+
+        function closePanel() {
+            panel.style.display = 'none';
+        }
+
+        function setStatus(txt) {
+            statusEl.textContent = txt;
+        }
+
+        function escapeHtml(s = '') {
+            return s.replace(/[&<>"']/g, c =>
+                ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[c]));
+        }
+
+        function addMsg(author, text) {
             const row = document.createElement('div');
             row.className = `rc-msg ${author}`;
             row.innerHTML = `<div class="bubble">${escapeHtml(text)}</div>`;
             messagesEl.appendChild(row);
             messagesEl.scrollTop = messagesEl.scrollHeight;
-        };
-        const escapeHtml = (s = '') => s.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[c]));
+        }
+
+        function toggleChat() {
+            formBox.style.display = 'none';
+            chatBox.style.display = 'flex';
+            inputBar.style.display = 'flex';
+        }
 
 
-        fab.addEventListener('click', () => {
-            openPanel();
-
-        });
-        closeBtn.addEventListener('click', closePanel);
-
-        startBtn.addEventListener('click', async () => {
+        async function startChat() {
             const name = nameEl.value.trim();
             const email = emailEl.value.trim();
+
             if (!name || !email) {
                 alert('Informe nome e e-mail.');
                 return;
             }
+
             localStorage.setItem('rc_name', name);
             localStorage.setItem('rc_email', email);
 
-            toggleChat()
-
             try {
-                const data = await startChat({ name, email })
+                const data = await createChat({ name, email });
                 if (data.id) {
-                    localStorage.setItem('rc_conversation_id', data.id)
-
+                    conversationId = data.id;
+                    localStorage.setItem('rc_conversation_id', data.id);
+                    toggleChat();
+                    initSocket();
+                    addMsg('agent', `Olá ${name}! Como podemos ajudar?`);
                 }
-                console.log(data)
             } catch (ex) {
-                console.error(Ex)
+                console.error('Falha ao criar chat:', ex);
+                setStatus('Erro ao conectar. Tente novamente.');
             }
-            addMsg('agent', `Olá ${name}! Como podemos ajudar?`);
-        });
-
-        function toggleChat() {
-            formBox.style.display = 'none';
-            chatBox.style.display = 'block';
-            inputBar.style.display = 'flex';
-            addMsg('agent', `Olá ${name}! Como podemos ajudar?`)
         }
 
-        async function startChat({ name, email }) {
+        async function createChat({ name, email }) {
             try {
-                const response = await api.post('/chats', {
-                    name, email
-                })
-                return response.data
+                const response = await api.post('/chats', { name, email });
+                return response.data;
             } catch (ex) {
-                console.error('Falha ao conectar')
+                console.error('Falha ao criar chat:', ex);
                 throw ex;
             }
         }
 
-        async function loadChat({ id }) {
+        async function loadChat(id) {
             try {
-                const response = await api.get(`/chats/${id}`)
+                const response = await api.get(`/chat/${id}`);
                 if (response.data.id) {
-                    openPanel()
-                    toggleChat()
+                    openPanel();
+                    toggleChat();
+                    initSocket();
+
+                    if (response.data.messages && Array.isArray(response.data.messages)) {
+                        response.data.messages.forEach(msg => {
+                            addMsg(msg.sender === 'client' ? 'client' : 'agent', msg.text);
+                        });
+                    }
+
+                    addMsg('agent', 'Como posso ajudar?');
                 }
             } catch (ex) {
-                console.error('Falha ao carregar')
-                throw ex;
+                console.error('Falha ao carregar chat:', ex);
+                localStorage.removeItem('rc_conversation_id');
+                conversationId = null;
             }
         }
 
-        sendBtn.addEventListener('click', sendCurrent);
-        textEl.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') { e.preventDefault(); sendCurrent(); }
-        });
+        function initSocket() {
+            if (!conversationId) {
+                console.error('Nenhum ID de conversa disponível para o socket');
+                return;
+            }
 
+            if (socket) {
+                socket.disconnect();
+            }
+
+            socket = io(WS_URL, {
+                transports: ['websocket'],
+                auth: {
+                    user: {
+                        name: 'client',
+                        email: 'client'
+                    },
+                    chatId: conversationId
+                }
+            });
+
+            socket.emit('client_connect')
+            
+            socket.on('connect', () => {
+                setStatus('Conectado');
+                
+            });
+
+            socket.on('disconnect', () => {
+                setStatus('Desconectado');
+            });
+
+            socket.on('agent_connect', (payload) => {
+                setStatus('Agente conectado');
+            });
+
+            socket.on('agent_message', (message) => {
+                console.log('chamou')
+                console.log('agent teste', message)
+                addMsg('agent', message);
+            });
+
+            socket.on('error', (error) => {
+                console.error('Erro no socket:', error);
+                setStatus('Erro de conexão');
+            });
+        }
+
+        function sendCurrent() {
+            const text = textEl.value.trim();
+            if (!text || !socket) return;
+
+            addMsg('client', text);
+            textEl.value = '';
+
+            socket.emit('client_message', text);
+        }
+        init();
     })();
+</script>
 </script>
