@@ -14,7 +14,7 @@ class ChatController extends Controller
 
     public function sendMessage(Request $request, int $id)
     {
-        
+
 
         $data = $request->validate([
             'message' => ['required', 'string', 'max:2000']
@@ -40,11 +40,9 @@ class ChatController extends Controller
 
         $chats = $this->chatService->getChats();
 
-        if ($request->has('selected_chat')) {
-            $request->session()->put('selected_chat', $request->get('selected_chat'));
-        }
+        $selectedId = $request->query('selected_chat');
 
-        $selectedId = $request->session()->get("selected_chat");
+     
         $chat = $selectedId ? $this->composeChat($request, $selectedId) : null;
 
         return view('dashboard.index', [

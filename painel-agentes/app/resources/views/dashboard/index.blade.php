@@ -2,7 +2,7 @@
 
 @auth
     <script>
-        window.AGENT = {
+        window.USER = {
             id: {{ Auth::id() }},
             name: @json(Auth::user()->name),
             email: @json(Auth::user()->email),
@@ -37,7 +37,7 @@
                     @endif
                 </div>
 
-                <div id="emptyState" class="alert alert-info">Selecione um chat na lista à esquerda.</div>
+      
             </main>
         </div>
         <script>

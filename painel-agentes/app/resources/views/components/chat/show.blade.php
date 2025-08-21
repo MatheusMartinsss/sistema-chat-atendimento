@@ -33,6 +33,7 @@
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
     <script>
         const token = window.TOKEN.token
+        const user = window.USER
         const q = new URLSearchParams(location.search);
         const chatId = q.get('selected_chat')
 
@@ -56,14 +57,16 @@
                 socket.emit('take_chat');
             }
         });
-        function appendMessage(author, text) {
+        function appendMessage(senderId, author, text) {
 
             const box = document.querySelector('.message-box');
             if (!box) return;
 
+            const isSender = senderId == user.id
+
             const div = document.createElement('div');
-            const cls = author === 'agent' ? 'text-primary' : 'text-success';
-            const label = author === 'agent' ? 'Agente' : 'Cliente';
+            const cls = isSender ? 'text-primary' : 'text-success';
+            const label = `${author}`;
 
             div.className = 'mb-2';
             div.innerHTML = `<strong class="${cls}">${label}:</strong> <span>${escapeHtml(text)}</span>`;
@@ -79,14 +82,14 @@
 
             socket.emit('agent_message', messageText);
 
-            appendMessage('agent', messageText);
+            appendMessage(user.id, user.name, messageText);
             input.value = '';
             input.focus();
             return false;
         }
 
-        socket.on('client_message', (message) => {
-            appendMessage('client', message);
+        socket.on('client_message', (payload) => {
+            appendMessage(payload.senderId, payload.name, payload.message);
         });
 
         function escapeHtml(text) {
